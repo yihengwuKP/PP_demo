@@ -187,11 +187,15 @@ class PE():
         self.fgs.append(fg_hot)
         self.system.addForce(LJ)
 
-    def add_reporter(self, n_steps, report_interval=1000, prefix="."):
+    def add_reporter(self, n_steps, report_interval=1000, prefix=".", restart=False):
         self.simulation.reporters.append(app.PDBReporter(f"{prefix}/output.pdb",
-                                                         report_interval*10))
+                                                         report_interval*10, 
+                                                         append=restart,
+                                                        ))
         self.simulation.reporters.append(app.DCDReporter(f"{prefix}/output.dcd",
-                                                         report_interval))
+                                                         report_interval,
+                                                         append=restart,
+                                                        ))
         self.simulation.reporters.append(
                             app.StateDataReporter(f"{prefix}/log", report_interval,
                                                   step=True,
@@ -204,17 +208,20 @@ class PE():
                                                   speed=True,
                                                   remainingTime=True,
                                                   totalSteps=n_steps,
+                                                  append=restart,
                                                   ))
         self.simulation.reporters.append(
                         app.CheckpointReporter(f'{prefix}/checkpnt.chk', report_interval))
 
-    def simulate(self, n_steps, n_record, step_size=0.5*unit.femtosecond):
+    def simulate(self, n_steps, n_record, step_size=0.5*unit.femtosecond, restart=False):
         self.system.addForce(mm.AndersenThermostat(298*unit.kelvin, 1/unit.picosecond))
         integrator = mm.VerletIntegrator(step_size)
         self.simulation = app.Simulation(self.top, self.system, integrator)
         self.simulation.context.setPositions(self.pos)
         self.simulation.context.setVelocitiesToTemperature(298*unit.kelvin)
         report_interval = max(1, int(n_steps/n_record))
-        self.add_reporter(n_steps, report_interval=report_interval)
+        self.add_reporter(n_steps, report_interval=report_interval, restart=restart)
         print(f"INFO - We are using {self.simulation.context.getPlatform().getName()} platform.")
+        if restart:
+            self.simulation.loadCheckpoint('checkpnt.chk')
         self.simulation.step(n_steps)

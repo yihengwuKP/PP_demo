@@ -14,6 +14,8 @@ parser.add_argument('--length',   '-l',  default=10,   type=int,
                                         help='the total number of  carbons in polyethylene.')
 parser.add_argument('--nsteps',     '-ns',  required=True,  type=lambda x: int(float(x)),
                                         help='how many steps should we run the MD for?')
+parser.add_argument('--restart',     '-re',  action='store_true', default=False,
+                                        help='restart the simulation from checkpnt')
 
 args = parser.parse_args()
 print("Initializing...")
@@ -26,4 +28,4 @@ print("Adding Dihedrals...")
 pe.add_dihedral()
 print("Adding LJs...")
 pe.add_LJ()
-pe.simulate(n_steps=args.nsteps, n_record=args.n_record, step_size=args.step_size*unit.femtosecond)
+pe.simulate(n_steps=args.nsteps, n_record=args.n_record, step_size=args.step_size*unit.femtosecond, restart=args.restart)
