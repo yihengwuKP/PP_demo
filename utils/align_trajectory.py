@@ -13,6 +13,8 @@ parser.add_argument('--pdb',     required=True,  type=str,
                                         help='path to pdb file')
 parser.add_argument('--dcd',     required=True,  type=str,
                                         help='path to dcd file')
+parser.add_argument('--rot-to-y',     action='store_true',
+                                        help='rotate end to end vector to align with y')
 
 args = parser.parse_args()
 
@@ -40,19 +42,21 @@ trans = transformations.center_in_box(u.select_atoms(f'id {first_atom.id}'),
                                       point=[0, 0, 0])
 u.trajectory.add_transformations(trans)
 
+
 # Save the transformed trajectory to a new file
 with mda.Writer('aligned.dcd', u.atoms.n_atoms) as W:
     for t in tqdm(u.trajectory):
-        # Step 2: Calculate the vector from the first atom to the last atom
-        vector = last_atom.position - first_atom.position
-        # Normalize the vector
-        direction = vector / np.linalg.norm(vector)
-        y_axis = np.array([0, 1, 0])
-    
-        theta = np.arccos(np.dot(y_axis, direction))
-        axis=np.cross(direction, y_axis)
-        axis/=np.linalg.norm(axis)
-        # Step 4: Rotate such that C1-Cend align with 0,1,0
-        rot=Rotation.from_rotvec(theta*axis)
-        u.atoms.positions = rot.apply(u.atoms.positions)
+        if args.rot_to_y:
+            # Step 2: Calculate the vector from the first atom to the last atom
+            vector = last_atom.position - first_atom.position
+            # Normalize the vector
+            direction = vector / np.linalg.norm(vector)
+            y_axis = np.array([0, 1, 0])
+
+            theta = np.arccos(np.dot(y_axis, direction))
+            axis=np.cross(direction, y_axis)
+            axis/=np.linalg.norm(axis)
+            # Step 4: Rotate such that C1-Cend align with 0,1,0
+            rot=Rotation.from_rotvec(theta*axis)
+            u.atoms.positions = rot.apply(u.atoms.positions)
         W.write(u)
