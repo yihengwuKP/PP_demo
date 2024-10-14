@@ -158,14 +158,17 @@ class Polymer():
         """
         rotation = self.rotate_to_axis(self.pos[-1]-self.pos[0], np.array([0, 0, 1]))
         self.pos = rotation.apply(self.pos)
+        self.write_init_config("aligned.pdb")
 
     def add_stretching_force(self, force):
         stretch = mm.openmm.CustomExternalForce("f*z*include")
         stretch.addGlobalParameter("f", force)
         stretch.addPerParticleParameter("include")
         for node in self.graph.nodes:
-            if node == 0 or node == len(self.graph.nodes)-1:
+            if node == 0:
                 stretch.addParticle(node, [1])
+            elif node == len(self.graph.nodes)-1:
+                stretch.addParticle(node, [-1])
             else:
                 stretch.addParticle(node, [0])
         fg_hot = self.name2fg['stretch']
