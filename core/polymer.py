@@ -3,12 +3,11 @@ from openmm import app, unit
 import networkx as nx
 import numpy as np
 from itertools import combinations, product
-
-
+from scipy.spatial.transform import Rotation
 
 
 class Polymer():
-    name2fg = {'bond': 0, 'angle': 1, 'dihedral': 2, 'LJ': 3}
+    name2fg = {'bond': 0, 'angle': 1, 'dihedral': 2, 'LJ': 3, 'stretch': 4}
     fg2name = {0: 'bond', 1: 'angle', 2: 'dihedral', 3: 'LJ'}
 
     def __init__(self):
@@ -122,6 +121,57 @@ class Polymer():
         LJ.setForceGroup(fg_hot)
         self.fgs.append(fg_hot)
         self.system.addForce(LJ)
+
+    @staticmethod
+    def rotate_to_axis(init_vec, end_vec):
+        """
+        the rotation that transform the init_vec to end_vec
+        basically the cross product gives the axis of the rotation, and the dot product gives the angle
+        """
+
+        # normalize the vectors
+        init_vec_hat = init_vec / np.linalg.norm(init_vec)
+        end_vec_hat = end_vec / np.linalg.norm(end_vec)
+
+        # compute the rotation axis
+        rot_axis = np.cross(init_vec_hat, end_vec_hat)
+        rot_axis_mag = np.linalg.norm(rot_axis)
+
+        if rot_axis_mag == 0:
+            # check if the init_vec and end_vec are already aligned
+            return Rotation.from_matrix(np.eye(3))
+
+        # normalize the rotation axis
+        rot_axis_hat = rot_axis/np.linalg.norm(rot_axis)
+
+        # compute the rotation angle
+        theta = np.arccos(np.dot(init_vec_hat, end_vec_hat))
+
+        # construct the rotation using axis-angle representation
+        rotation = Rotation.from_rotvec(rot_axis_hat*theta)
+
+        return rotation
+
+    def align_z_axis(self):
+        """
+        align the end-to-end vector with z-axis
+        """
+        rotation = self.rotate_to_axis(self.pos[-1]-self.pos[0], np.array([0, 0, 1]))
+        self.pos = rotation.apply(self.pos)
+
+    def add_stretching_force(self, force):
+        stretch = mm.openmm.CustomExternalForce("f*z*include")
+        stretch.addGlobalParameter("f", force)
+        stretch.addPerParticleParameter("include")
+        for node in self.graph.nodes:
+            if node == 0 or node == len(self.graph.nodes)-1:
+                stretch.addParticle(node, [1])
+            else:
+                stretch.addParticle(node, [0])
+        fg_hot = self.name2fg['stretch']
+        stretch.setForceGroup(fg_hot)
+        self.fgs.append(fg_hot)
+        self.system.addForce(stretch)
 
     def add_reporter(self, n_steps, report_interval=1000, prefix=".", restart=False):
         self.simulation.reporters.append(app.PDBReporter(f"{prefix}/output.pdb",
